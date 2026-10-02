@@ -82,21 +82,37 @@ export default async function ProductPage({
       {/* ---- Gallery strip ---- */}
       {images.gallery.length > 0 && (
         <section className="container-page py-10">
-          <div className="grid gap-6 sm:grid-cols-3">
-            {images.gallery.map((src, i) => (
-              <div
-                key={src + i}
-                className="relative aspect-square overflow-hidden rounded-2xl bg-mist"
-              >
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Left column: two stacked landscape shots */}
+            <div className="grid gap-6">
+              {images.gallery.slice(0, 2).map((src, i) => (
+                <div
+                  key={src + i}
+                  className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-mist"
+                >
+                  <Image
+                    src={src}
+                    alt={`${product.name} view ${i + 1}`}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Right column: one tall full-height shot */}
+            {images.gallery[2] && (
+              <div className="relative overflow-hidden rounded-2xl bg-mist aspect-square md:aspect-auto md:h-full md:min-h-[420px]">
                 <Image
-                  src={src}
-                  alt={`${product.name} view ${i + 1}`}
+                  src={images.gallery[2]}
+                  alt={`${product.name} view 3`}
                   fill
-                  sizes="(max-width: 640px) 100vw, 33vw"
-                  className="object-contain p-4"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover"
                 />
               </div>
-            ))}
+            )}
           </div>
         </section>
       )}

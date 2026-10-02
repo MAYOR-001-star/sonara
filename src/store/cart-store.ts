@@ -12,10 +12,14 @@ export type CartLine = {
   accent: "peach" | "mist" | "ink";
 };
 
+export type CartLineSeed = Omit<CartLine, "quantity">;
+
 type CartState = {
   lines: CartLine[];
   isOpen: boolean;
   addLine: (product: Omit<CartLine, "quantity">, quantity?: number) => void;
+  /** Puts one of every given product in the cart. Dev/testing helper. */
+  fillCart: (products: CartLineSeed[]) => void;
   removeLine: (id: string) => void;
   setQuantity: (id: string, quantity: number) => void;
   clear: () => void;
@@ -56,6 +60,18 @@ export const useCartStore = create<CartState>()(
             isOpen: true,
           };
         }),
+
+      /* Replaces the cart with one of every product, each at quantity 1.
+         Existing quantities are reset rather than incremented so repeated
+         runs are idempotent. Quantities are still clamped to MAX_PER_LINE. */
+      fillCart: (products) =>
+        set((state) => ({
+          lines: products.map((product) => ({
+            ...product,
+            quantity: Math.min(MAX_PER_LINE, 1),
+          })),
+          isOpen: true,
+        })),
 
       removeLine: (id) =>
         set((state) => ({ lines: state.lines.filter((l) => l.id !== id) })),

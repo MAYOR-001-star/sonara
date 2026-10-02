@@ -78,6 +78,19 @@ alter table public.products   enable row level security;
 alter table public.orders     enable row level security;
 alter table public.order_items enable row level security;
 
+-- Privileges. Enabling RLS does NOT grant access: the PostgREST roles also need
+-- explicit table grants, or every query fails with
+-- `42501 permission denied for table products` even when a policy allows it.
+grant usage on schema public to anon, authenticated, service_role;
+grant select on public.products to anon, authenticated, service_role;
+grant insert on public.orders to anon, authenticated, service_role;
+grant select on public.orders to anon, authenticated, service_role;
+grant insert on public.order_items to anon, authenticated, service_role;
+grant select on public.order_items to anon, authenticated, service_role;
+-- Sequences: order ids use gen_random_uuid(), so none are needed today, but the
+-- service role gets them for any future serial column.
+grant all on all sequences in schema public to service_role;
+
 drop policy if exists "products are public" on public.products;
 create policy "products are public"
   on public.products for select
@@ -95,6 +108,18 @@ create policy "users read own orders"
   on public.orders for select
   using (auth.uid() = user_id);
 
+-- Guest receipts: the order-success page needs to re-read the order it just
+-- created with no session, which the own-orders policy above forbids. Guest
+-- rows have `user_id is null`, so a signed-in visitor can never match one; the
+-- only way in is knowing the unguessable `AP-XXXXXX` reference, and only for 24h.
+drop policy if exists "anyone can read recent guest orders" on public.orders;
+create policy "anyone can read recent guest orders"
+  on public.orders for select
+  using (
+    user_id is null
+    and created_at > now() - interval '1 day'
+  );
+
 -- Items are visible when their parent order is visible.
 drop policy if exists "users read own order items" on public.order_items;
 create policy "users read own order items"
@@ -104,6 +129,25 @@ create policy "users read own order items"
       select 1 from public.orders o
       where o.id = order_items.order_id
         and o.user_id = auth.uid()
+    )
+  );
+
+-- Line items are written as the second half of checkout, immediately after the
+-- parent order row. Without this INSERT policy the order itself saves but
+-- `order_items` fails with `new row violates row level security policy`, so the
+-- insert must be allowed for any order the caller can see - a freshly created
+-- one, or their own.
+drop policy if exists "anyone can create order items" on public.order_items;
+create policy "anyone can create order items"
+  on public.order_items for insert
+  with check (
+    exists (
+      select 1 from public.orders o
+      where o.id = order_items.order_id
+        and (
+          o.user_id is null
+          or o.user_id = auth.uid()
+        )
     )
   );
 

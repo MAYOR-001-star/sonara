@@ -35,6 +35,15 @@ yarn-error.log*
 .env*.local
 !.env.example
 
+# Supabase CLI
+/supabase/.branches
+/supabase/.temp
+
+# local scratch output from ad-hoc probes and manual builds
+*.log
+/build.log
+/dev.log
+
 # vercel
 .vercel
 

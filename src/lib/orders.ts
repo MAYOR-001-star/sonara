@@ -1,5 +1,5 @@
-import { createClient } from "./supabase/server";
-import { getProduct } from "./catalog";
+import { createClient, getCurrentUser } from "./supabase/server";
+import { getProducts } from "./catalog";
 import { cartTotals, type Category } from "./products";
 import { isSupabaseConfigured } from "./supabase/client";
 import { sendOrderConfirmation } from "./mailgun";
@@ -65,9 +65,14 @@ export async function placeOrder(
   const errors = validate(payload);
   if (errors.length) return { ok: false, error: errors.join(" ") };
 
+  // Resolve every line once up front. Cart lines carry the product **id**
+  // (`p-xx99-mark-ii`), not the slug, so they must be looked up by id —
+  // `getProduct` filters on `slug` and would reject every line as "no longer
+  // exists".
+  const catalogue = await getProducts();
   const resolved = [];
   for (const line of payload.lines) {
-    const product = await getProduct(line.id);
+    const product = catalogue.find((p) => p.id === line.id);
     if (!product) return { ok: false, error: "A product in your cart no longer exists." };
     if (line.quantity < 1 || line.quantity > 10)
       return { ok: false, error: "Invalid quantity." };
@@ -160,15 +165,26 @@ export async function placeOrder(
   return { ok: true, orderId, emailSent: mail.ok };
 }
 
-/** Loads a previously placed order for the confirmation / receipt page. */
+/**
+ * Loads a previously placed order for the confirmation / receipt page.
+ *
+ * Scoped to the signed-in owner as a second layer of defence: RLS already
+ * refuses to return another user's row, but this also guarantees the app never
+ * renders PII from a stale or misconfigured policy. Returns null for anonymous
+ * callers and for orders belonging to somebody else.
+ */
 export async function getOrder(orderId: string) {
   if (!isSupabaseConfigured()) return null;
   try {
+    const user = await getCurrentUser();
+    if (!user) return null;
+
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("orders")
       .select("*, order_items(*)")
       .eq("order_id", orderId)
+      .eq("user_id", user.id)
       .maybeSingle();
     if (error) throw error;
     return data ?? null;

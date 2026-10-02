@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { getOrder } from "@/lib/orders";
 import { formatPrice } from "@/lib/products";
 
-export const metadata: Metadata = { title: "Order details" };
+export const metadata: Metadata = {
+  title: "Order details",
+  // Order pages are private and owner-scoped; keep them out of search indexes.
+  robots: { index: false, follow: false },
+};
 
 export default async function OrderPage({
   params,

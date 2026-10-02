@@ -100,7 +100,7 @@ export const seedProducts: Product[] = [
     ],
     inTheBox: ["YX1 Earbuds", "Charging case", "4 ear tip sizes", "USB-C cable"],
     isNew: false,
-    accent: "ink",
+    accent: "mist",
   },
   {
     id: "p-yx2-earphones",
@@ -116,7 +116,7 @@ export const seedProducts: Product[] = [
     ],
     inTheBox: ["YX2 Earbuds", "Wireless charging case", "4 ear tip sizes", "USB-C cable"],
     isNew: true,
-    accent: "ink",
+    accent: "mist",
   },
   {
     id: "p-yx3-earphones",
@@ -132,7 +132,7 @@ export const seedProducts: Product[] = [
     ],
     inTheBox: ["YX3 Earbuds", "Studio case", "Memory foam tips", "USB-C cable"],
     isNew: true,
-    accent: "ink",
+    accent: "mist",
   },
 ];
 

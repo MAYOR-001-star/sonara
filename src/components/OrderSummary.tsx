@@ -1,8 +1,9 @@
 "use client";
 
-import { formatPrice } from "@/lib/products";
+import { formatPrice, productImages } from "@/lib/products";
 import { useCartStore } from "@/store/cart-store";
 import ProductArt from "./ProductArt";
+import QuantityStepper from "./QuantityStepper";
 
 /** Order summary card shown alongside the checkout form. */
 export default function OrderSummary({
@@ -37,6 +38,8 @@ export default function OrderSummary({
         {priced.map((l) => (
           <li key={l.id} className="flex gap-4 py-5">
             <div className="w-16 shrink-0">
+              {/* `image` is keyed by product id, which the cart line already carries.
+                  Omitting it fell back to ProductArt's inline placeholder glyph. */}
               <ProductArt
                 category={
                   l.slug.includes("speaker")
@@ -46,6 +49,9 @@ export default function OrderSummary({
                       : "headphones"
                 }
                 accent={l.accent}
+                image={productImages[l.id]?.hero}
+                alt={l.name}
+                sizes="64px"
                 className="rounded-xl"
               />
             </div>
@@ -59,16 +65,12 @@ export default function OrderSummary({
               </div>
 
               <div className="mt-3 flex items-center gap-4">
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
+                {/* Shared stepper so checkout matches the cart drawer's
+                    -/+ pill rather than a raw number input. */}
+                <QuantityStepper
                   value={l.quantity}
-                  aria-label={`Quantity of ${l.name}`}
-                  onChange={(e) =>
-                    setQuantity(l.id, Number(e.target.value) || 1)
-                  }
-                  className="w-14 rounded-lg border border-tan bg-mist px-2 py-1 text-center text-xs"
+                  onChange={(q) => setQuantity(l.id, q)}
+                  small
                 />
                 <button
                   type="button"

@@ -48,16 +48,15 @@ export default async function CategoryPage({
       {/* ---- Featured product in category ---- */}
       {hero && (
         <section className="container-page grid items-center gap-12 py-20 md:grid-cols-2">
-          {/* Image only — the name, copy and CTA sit alongside it, so a full
-              ProductCard here would duplicate them. */}
+          {/* accent="none" so the featured product sits on the page surface with
+              no mist panel behind the cut-out. */}
           <ProductArt
             category={hero.category}
-            accent={hero.accent}
+            accent="none"
             image={productImages[hero.id]?.hero}
             alt={hero.name}
             priority
             sizes="(max-width: 768px) 100vw, 50vw"
-            className="w-full rounded-3xl"
           />
           <div>
             {hero.isNew && (
@@ -81,10 +80,14 @@ export default async function CategoryPage({
         <section className="bg-mist py-20">
           <div className="container-page">
             <h2 className="text-xl">More {categoryLabel[category as Category]}</h2>
-            {/* Flex row of cards; each card stacks image -> description -> title. */}
-            <div className="mt-10 flex flex-col gap-12 sm:flex-row sm:items-start sm:gap-8">
+            {/* Grid, not a flex row of `flex-1` children: `flex-1` made a lone
+                leftover card (a category with only one product after the hero)
+                expand to the full container width, so its square artwork rendered
+                huge and the CTA stretched edge to edge. A 2-column grid keeps that
+                single card in the first column and still balances a pair. */}
+            <div className="mt-10 grid gap-12 sm:grid-cols-2 sm:gap-8">
               {sub.map((p) => (
-                <div key={p.id} className="sm:flex-1">
+                <div key={p.id}>
                   <ProductCard product={p} description={p.description} />
                 </div>
               ))}

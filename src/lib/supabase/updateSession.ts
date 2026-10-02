@@ -1,8 +1,45 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import type { User } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+/** True when real Supabase credentials are present. */
+export function hasSupabaseEnv() {
+  return Boolean(url && key && !url.includes("your-project"));
+}
+
+/**
+ * Verifies the request's auth cookie against Supabase and returns the signed-in
+ * user, or null. `getUser()` revalidates the JWT with the auth server rather
+ * than trusting the cookie's contents.
+ *
+ * Split out of `updateSession` so the route gate can make its auth decision
+ * before deciding whether the session needs refreshing.
+ */
+export async function getRequestUser(
+  request: NextRequest,
+): Promise<{ user: User | null }> {
+  if (!url || !key || url.includes("your-project")) return { user: null };
+
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      // Read-only here: refresh cookies are written by `updateSession`, not by
+      // the gate, so a blocked request never mutates the session.
+      setAll() {},
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return { user };
+}
 
 /**
  * Refreshes the Supabase auth session on every matched request and keeps the

@@ -17,7 +17,9 @@
   --font-display: var(--font-archivo), var(--font-manrope), ui-sans-serif,
     system-ui, sans-serif;
 
-  --text-hero: 3.5rem;
+  /* Fluid so the hero headline scales with the viewport instead of forcing a
+     fixed 3.5rem at every width (which wrapped badly on phones). */
+  --text-hero: clamp(2rem, 8vw, 3.5rem);
   --text-hero--line-height: 1.02;
   --text-hero--letter-spacing: -0.01em;
 
@@ -36,6 +38,23 @@
   mask-image: radial-gradient(
     ellipse 78% 78% at 50% 50%,
     #000 62%,
+    transparent 100%
+  );
+}
+
+/* Gentler dissolve for the home hero. The design keeps the headphone a solid,
+   clearly-defined silhouette that fills the frame with the copy nested inside
+   the headband, so the mask must not eat the artwork's edges - the tighter
+   `blend-into-ink` above fades it into a ghost and the text spills outside. */
+@utility blend-into-ink-soft {
+  -webkit-mask-image: radial-gradient(
+    ellipse 92% 92% at 50% 50%,
+    #000 88%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 92% 92% at 50% 50%,
+    #000 88%,
     transparent 100%
   );
 }

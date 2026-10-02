@@ -1,12 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getProducts, getProductsByCategory } from "@/lib/catalog";
-import { categories, productImages, storeArt, brandName } from "@/lib/products";
+import { categories, storeArt, brandName } from "@/lib/products";
 import ProductCard from "@/components/ProductCard";
-import ProductArt from "@/components/ProductArt";
 import Hero from "@/components/Hero";
 import CategoryTile from "@/components/CategoryTile";
-import AddToCartButton from "@/components/AddToCartButton";
+import SpotlightBanner from "@/components/SpotlightBanner";
 
 export default async function HomePage() {
   const [all, headphones, speakers, earphones] = await Promise.all([
@@ -27,13 +26,15 @@ export default async function HomePage() {
 
       {/* ---- Category tiles ---- */}
       <section className="container-page py-20">
-        <div className="grid gap-8 md:grid-cols-3">
+        {/* Exactly three categories, so the grid steps straight from one to three
+            columns. A 2-column step would leave the third tile orphaned on its
+            own row at tablet widths. */}
+        <div className="grid gap-6 sm:grid-cols-3">
           {categories.map((c) => (
             <CategoryTile
               key={c}
               category={c}
               product={byCategory[c][0]}
-              count={byCategory[c].length}
             />
           ))}
         </div>
@@ -48,7 +49,10 @@ export default async function HomePage() {
               Shop all &rsaquo;
             </Link>
           </div>
-          <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Three featured products, so go straight to three columns at `sm`.
+              A 2-column step left the third card orphaned on its own row at
+              tablet widths, mirroring the category grid above. */}
+          <div className="mt-10 grid gap-8 sm:grid-cols-3">
             {featured.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
@@ -59,39 +63,17 @@ export default async function HomePage() {
       {/* ---- Spotlight banners ---- */}
       <section className="container-page space-y-10 py-20">
         {zx9 && (
-          <div className="grid items-center gap-10 overflow-hidden rounded-3xl bg-peach p-10 md:grid-cols-2 md:p-16">
-            <ProductArt category="speakers" accent="mist" image={productImages[zx9.id]?.hero} alt={zx9.name} sizes="(max-width: 768px) 100vw, 50vw" className="order-last w-full rounded-2xl md:order-first" />
-            <div>
-              <h2 className="text-2xl md:text-3xl">{zx9.name}</h2>
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-ink/70">
-                {zx9.description}
-              </p>
-              <div className="mt-8">
-                <AddToCartButton product={zx9} />
-              </div>
-            </div>
-          </div>
+          <SpotlightBanner product={zx9} accent="bg-accent" />
         )}
 
         {zx7 && (
-          <div className="grid items-center gap-10 overflow-hidden rounded-3xl bg-mist p-10 md:grid-cols-2 md:p-16">
-            <div>
-              <h2 className="text-2xl md:text-3xl">{zx7.name}</h2>
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-ink/70">
-                {zx7.description}
-              </p>
-              <div className="mt-8">
-                <AddToCartButton product={zx7} className="btn-outline" />
-              </div>
-            </div>
-            <ProductArt category="speakers" accent="peach" image={productImages[zx7.id]?.hero} alt={zx7.name} sizes="(max-width: 768px) 100vw, 50vw" className="w-full rounded-2xl" />
-          </div>
+          <SpotlightBanner product={zx7} accent="bg-ink" cta="Shop the ZX7" />
         )}
       </section>
 
       {/* ---- About band ---- */}
       <section className="container-page py-20">
-        <div className="grid items-center gap-12 md:grid-cols-2">
+        <div className="grid items-center gap-12 lg:grid-cols-2">
           <div>
             <h2 className="text-2xl leading-tight md:text-3xl">
               Bringing you the <span className="text-peach">best</span> audio gear
@@ -104,9 +86,6 @@ export default async function HomePage() {
               to meet some of the fantastic people who make {brandName} the best place
               to buy your portable audio equipment.
             </p>
-            <Link href="/category/speakers" className="btn-link mt-8">
-              Visit the store &rsaquo;
-            </Link>
           </div>
           <div className="relative aspect-square overflow-hidden rounded-3xl bg-mist">
             <Image

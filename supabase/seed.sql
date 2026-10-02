@@ -1,4 +1,21 @@
 -- ---------------------------------------------------------------------------
+-- Grant the PostgREST roles access to the store tables.
+--
+-- Run this once if queries fail with
+--   42501 permission denied for table products
+-- Enabling RLS is not enough on its own: anon/authenticated also need explicit
+-- table privileges, or every policy is unreachable. Idempotent - safe to re-run.
+-- ---------------------------------------------------------------------------
+grant usage on schema public to anon, authenticated, service_role;
+
+grant select on public.products to anon, authenticated, service_role;
+
+grant insert, select on public.orders to anon, authenticated, service_role;
+
+grant insert, select on public.order_items to anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
 -- Seed catalogue (matches src/lib/seed-products.ts)
 -- ---------------------------------------------------------------------------
 insert into public.products
@@ -86,3 +103,8 @@ on conflict (id) do update set
   in_the_box  = excluded.in_the_box,
   is_new      = excluded.is_new,
   accent      = excluded.accent;
+
+-- ---------------------------------------------------------------------------
+-- Sanity check: should return 8 once the seed above has run.
+-- ---------------------------------------------------------------------------
+select count(*) as product_count from public.products;

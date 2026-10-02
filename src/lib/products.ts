@@ -37,6 +37,17 @@ export function formatPrice(
 export const shippingFlatRate = Number(process.env.SHIPPING_FLAT_RATE || 50);
 
 /**
+ * Contact address shown on the legal pages.
+ *
+ * Configurable rather than hardcoded so it can point at a real, monitored inbox
+ * before launch. Falls back to the Mailgun sending domain so the value is
+ * self-consistent in development, and never renders as a bare placeholder.
+ */
+export const supportEmail = () =>
+  process.env.NEXT_PUBLIC_SUPPORT_EMAIL ||
+  `support@${process.env.MAILGUN_DOMAIN || "sonora.example"}`;
+
+/**
  * Maps a product `id` to the artwork bundled in `/public`.
  *
  * The database only stores catalogue data (name, price, copy), so image paths

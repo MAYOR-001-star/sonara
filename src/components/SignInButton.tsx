@@ -32,7 +32,7 @@ function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
-const initialState: AuthState = { error: null };
+const initialState: AuthState = { error: null, message: null };
 
 /**
  * Google sign-in button. `redirect()` inside the server action navigates
@@ -94,4 +94,3 @@ export default function SignInButton({
     </div>
   );
 }
-

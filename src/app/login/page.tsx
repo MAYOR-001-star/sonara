@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import SignInButton from "@/components/SignInButton";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { isMailgunConfigured } from "@/lib/mailgun";
+import AuthForm from "@/components/AuthForm";
+import { getCurrentUser } from "@/lib/supabase/server";
 import { brandName, brandNameLower } from "@/lib/products";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -15,6 +16,10 @@ export default async function LoginPage({
   const { next, error, mode } = await searchParams;
   const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : "/";
   const isSignup = mode !== "signin";
+
+  // Already signed in? No reason to show the forms.
+  const user = await getCurrentUser();
+  if (user) redirect(safeNext);
 
   const copy = isSignup
     ? {
@@ -92,47 +97,44 @@ export default async function LoginPage({
             </p>
           )}
 
-          {/* Google is the only auth method — no form fields by design. */}
+          {/* Email + password first; Google is the secondary option. */}
           <div className="mt-10">
-            <SignInButton next={safeNext} variant="full" label={copy.cta} />
+            <AuthForm
+              mode={isSignup ? "signup" : "signin"}
+              next={safeNext}
+            />
           </div>
 
-          <div className="mt-10 flex items-center gap-4" aria-hidden="true">
+          <div className="mt-8 flex items-center gap-4" aria-hidden="true">
             <span className="h-px flex-1 bg-tan" />
             <span className="text-[11px] tracking-[0.2em] text-ink/30 uppercase">
-              Or continue as guest
+              Or continue with
             </span>
             <span className="h-px flex-1 bg-tan" />
           </div>
 
-          <Link href="/checkout" className="btn-dark mt-6 w-full">
-            Checkout without an account
-          </Link>
+          <div className="mt-6">
+            <SignInButton next={safeNext} variant="full" label={copy.cta} />
+          </div>
 
           <p className="mt-8 text-center text-[11px] leading-relaxed text-ink/40">
             By continuing, you agree to our{" "}
-            <span className="underline underline-offset-2">Terms of Service</span>{" "}
+            <Link
+              href="/terms"
+              className="underline underline-offset-2"
+            >
+              Terms of Service
+            </Link>{" "}
             and{" "}
-            <span className="underline underline-offset-2">Privacy Policy</span>.
+            <Link
+              href="/privacy"
+              className="underline underline-offset-2"
+            >
+              Privacy Policy
+            </Link>
+            .
             We never see or store your Google password.
           </p>
-
-          {/* Setup status, so you can see what still needs credentials. */}
-          <div className="mt-10 rounded-2xl bg-mist p-5 text-[11px] leading-relaxed text-ink/50">
-            <p className="font-bold tracking-[0.15em] text-ink/70 uppercase">
-              Configuration status
-            </p>
-            <ul className="mt-2 space-y-1">
-              <li>
-                Supabase + Google auth:{" "}
-                {isSupabaseConfigured() ? "ready" : "not configured"}
-              </li>
-              <li>
-                Mailgun emails:{" "}
-                {isMailgunConfigured() ? "ready" : "not configured"}
-              </li>
-            </ul>
-          </div>
         </div>
       </div>
     </section>

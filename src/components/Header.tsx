@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useCartCount, useCartStore } from "@/store/cart-store";
 import { CartIcon } from "./AddToCartButton";
 import { categories, categoryLabel, brandName } from "@/lib/products";
-import SignInButton from "./SignInButton";
+import AuthNavLink from "./AuthNavLink";
 
 export default function Header() {
   const pathname = usePathname();
@@ -42,8 +42,8 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-5">
-          {/* The Google mark is redundant in the nav bar; text is enough. */}
-          <SignInButton showIcon={false} />
+          {/* Session-aware: shows Sign in, or Account + Sign out when signed in. */}
+          <AuthNavLink />
 
           <button
             type="button"
@@ -73,24 +73,34 @@ export default function Header() {
         </div>
       </div>
 
+      {/* Full-screen overlay menu: the panel is fixed to the viewport instead of
+          pushing page content down, and each link is a large centred row as in
+          the design. `inset-0` + `top` offsets clear the sticky header bar. */}
       {mobileOpen && (
-        <nav className="border-t border-white/10 px-5 pb-6 md:hidden">
-          <div className="flex flex-col gap-4 pt-4">
-            <Link href="/" className="nav-link" onClick={() => setMobileOpen(false)}>
+        <div className="fixed inset-x-0 top-[61px] bottom-0 z-40 overflow-y-auto bg-ink md:hidden">
+          <nav className="flex h-full flex-col items-center justify-center gap-2 px-5 py-10">
+            <Link
+              href="/"
+              className="w-full py-4 text-center text-2xl font-extrabold tracking-[0.08em] text-white uppercase transition-colors hover:text-accent"
+              onClick={() => setMobileOpen(false)}
+            >
               Home
             </Link>
             {categories.map((c) => (
               <Link
                 key={c}
                 href={`/category/${c}`}
-                className="nav-link"
+                className="w-full py-4 text-center text-2xl font-extrabold tracking-[0.08em] text-white uppercase transition-colors hover:text-accent"
                 onClick={() => setMobileOpen(false)}
               >
                 {categoryLabel[c]}
               </Link>
             ))}
-          </div>
-        </nav>
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <AuthNavLink />
+            </div>
+          </nav>
+        </div>
       )}
     </header>
   );

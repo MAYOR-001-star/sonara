@@ -3,10 +3,11 @@ import Image from "next/image";
 /**
  * Product imagery tile.
  *
- * When an `image` is supplied it renders the real artwork from `/public`,
- * scaled to fill the tile and `object-cover` so odd aspect ratios still fill
- * the square. Without one it falls back to the inline vector placeholder, so
- * the storefront never renders an empty box.
+ * When an `image` is supplied it renders the real artwork from `/public` as a
+ * transparent cut-out scaled to fit the tile, with no tile background and no
+ * inner padding — the product sits directly on the page surface, matching the
+ * design. Without an image it falls back to the inline vector placeholder on an
+ * accent background, so the storefront never renders an empty box.
  */
 export default function ProductArt({
   category,
@@ -18,6 +19,7 @@ export default function ProductArt({
   priority = false,
   sizes = "(max-width: 768px) 100vw, 33vw",
   fit = "contain",
+  square = true,
 }: {
   category: "headphones" | "speakers" | "earphones";
   accent?: "peach" | "mist" | "ink" | "none";
@@ -34,6 +36,11 @@ export default function ProductArt({
    * `cover` fills the tile edge-to-edge, used for photographic banners.
    */
   fit?: "contain" | "cover";
+  /**
+   * Locks the tile to a 1:1 box. Turn it off for full-bleed artwork that should
+   * fill an arbitrary container (the home hero) instead of letterboxing.
+   */
+  square?: boolean;
 }) {
   const bg =
     {
@@ -48,7 +55,7 @@ export default function ProductArt({
 
   return (
     <div
-      className={`relative flex aspect-square items-center justify-center overflow-hidden ${bg} ${className}`}
+      className={`relative flex items-center justify-center overflow-hidden ${square ? "aspect-square" : ""} ${bg} ${className}`}
     >
       {image ? (
         <Image
@@ -58,20 +65,21 @@ export default function ProductArt({
           priority={priority}
           sizes={sizes}
           className={
-            (fit === "cover"
-              ? "object-cover"
-              : "object-contain p-4 sm:p-6") +
-            ` ${imageClassName}` +
-            // Product SVGs ship with an opaque white backdrop; multiply lets it
-            // drop out so the tile reads as one continuous colour. Skipped on
-            // dark tiles, where multiply would crush the product to black.
-            (accent === "mist" && fit === "contain" ? " mix-blend-multiply" : "")
+            (fit === "cover" ? "object-cover" : "object-contain") +
+            ` ${imageClassName} ` +
+            // Product SVGs ship with an opaque white backdrop. Multiply lets it
+            // dissolve into the tile colour, so the cut-out reads as one
+            // continuous surface instead of sitting inside a second, visible
+            // panel. This is why the image carries no padding - padding was
+            // what exposed the backdrop as its own inset rectangle.
+            // Skipped on dark tiles, where multiply would crush the product.
+            (accent === "ink" && fit === "contain" ? "" : " mix-blend-multiply")
           }
         />
       ) : (
         <>
           {/* Decorative concentric arcs, matching the ZX9 banner in the design */}
-          <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full opacity-25" aria-hidden="true">
+          <svg viewBox="0 0 200 200" className="relative h-full w-full opacity-25" aria-hidden="true">
             <g fill="none" stroke="currentColor" strokeWidth="0.75">
               <circle cx="100" cy="100" r="40" />
               <circle cx="100" cy="100" r="60" />

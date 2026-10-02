@@ -7,11 +7,9 @@ import type { Product } from "@/lib/products";
 export default function CategoryTile({
   category,
   product,
-  count,
 }: {
   category: Category;
   product?: Product;
-  count: number;
 }) {
   return (
     <Link
@@ -29,11 +27,10 @@ export default function CategoryTile({
           />
         </div>
       )}
-      <h3 className="mt-8 text-sm">{categoryLabel[category]}</h3>
+      <h3 className="mt-8 text-sm font-bold uppercase tracking-[0.2em]">
+        {categoryLabel[category]}
+      </h3>
       <span className="btn-link mt-3 justify-center">Shop &rsaquo;</span>
-      <p className="mt-2 text-xs text-ink/40">
-        {count} product{count === 1 ? "" : "s"}
-      </p>
     </Link>
   );
 }

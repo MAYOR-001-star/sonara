@@ -12,7 +12,7 @@ const socials = [
 export default function Footer() {
   return (
     <footer className="mt-24 bg-ink text-white">
-      <div className="container-page grid gap-12 py-16 md:grid-cols-[2fr_1fr_1fr]">
+      <div className="container-page grid gap-12 py-16 sm:grid-cols-2 md:grid-cols-[2fr_1fr_1fr_1fr]">
         <div>
           <p className="font-display text-xl font-extrabold tracking-[-0.02em]">
             {brandName.toLowerCase()}
@@ -73,8 +73,11 @@ export default function Footer() {
           </ul>
         </nav>
 
-        <nav>
-          <p className="text-[11px] font-bold tracking-[0.2em] text-peach uppercase">
+        <nav aria-labelledby="footer-support">
+          <p
+            id="footer-support"
+            className="text-[11px] font-bold tracking-[0.2em] text-peach uppercase"
+          >
             Support
           </p>
           <ul className="mt-5 space-y-3">
@@ -87,8 +90,11 @@ export default function Footer() {
               </Link>
             </li>
             <li>
+              {/* Order history lives on the account page. The anchor scrolls
+                  straight to it, so this is a real destination rather than a
+                  duplicate of "My account" above. */}
               <Link
-                href="/account"
+                href="/account#your-orders"
                 className="text-sm text-white/60 transition-colors hover:text-peach"
               >
                 Track an order
@@ -100,6 +106,33 @@ export default function Footer() {
                 className="text-sm text-white/60 transition-colors hover:text-peach"
               >
                 Sign in
+              </Link>
+            </li>
+          </ul>
+        </nav>
+
+        <nav aria-labelledby="footer-legal">
+          <p
+            id="footer-legal"
+            className="text-[11px] font-bold tracking-[0.2em] text-peach uppercase"
+          >
+            Legal
+          </p>
+          <ul className="mt-5 space-y-3">
+            <li>
+              <Link
+                href="/privacy"
+                className="text-sm text-white/60 transition-colors hover:text-peach"
+              >
+                Privacy policy
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/terms"
+                className="text-sm text-white/60 transition-colors hover:text-peach"
+              >
+                Terms of service
               </Link>
             </li>
           </ul>
