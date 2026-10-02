@@ -1,0 +1,209 @@
+@import "tailwindcss";
+
+@theme {
+  /* ---- Design tokens (rebrand: graphite + bronze) ---- */
+  --color-ink: #131313;
+  --color-tan: #d9d5cd;
+  --color-mist: #f1f2f4;
+  --color-paper: #fbfbfc;
+  /* Bronze replaces the old peach; `--color-peach` stays as an alias so the
+     existing `bg-peach` / `text-peach` utilities keep resolving. */
+  --color-accent: #c98a52;
+  --color-peach: var(--color-accent);
+  --color-white: #ffffff;
+  --color-danger: #d64545;
+
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-archivo), var(--font-manrope), ui-sans-serif,
+    system-ui, sans-serif;
+
+  --text-hero: 3.5rem;
+  --text-hero--line-height: 1.02;
+  --text-hero--letter-spacing: -0.01em;
+
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 1.25rem;
+}
+
+/* Dissolves an artwork's baked-in panel colour into the surrounding hero
+   background so the edges blend instead of showing a seam. */
+@utility blend-into-ink {
+  -webkit-mask-image: radial-gradient(
+    ellipse 78% 78% at 50% 50%,
+    #000 62%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 78% 78% at 50% 50%,
+    #000 62%,
+    transparent 100%
+  );
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  /* Display headings: tighter tracking and the display face, per rebrand */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-ink);
+  }
+}
+
+@layer components {
+  /* Tailwind v4 cannot @apply a custom class, so the shared button base is
+     repeated in each variant via a CSS custom property mixin. */
+  .btn,
+  .btn-primary,
+  .btn-dark,
+  .btn-inverse,
+  .btn-outline {
+    display: inline-flex;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: color 200ms, background-color 200ms, border-color 200ms;
+  }
+
+  .btn-primary {
+    background-color: var(--color-peach);
+    color: var(--color-ink);
+  }
+  .btn-primary:hover {
+    background-color: var(--color-ink);
+    color: var(--color-white);
+  }
+
+  .btn-dark {
+    background-color: var(--color-ink);
+    color: var(--color-white);
+  }
+  .btn-dark:hover {
+    background-color: var(--color-peach);
+    color: var(--color-ink);
+  }
+
+  .btn-outline {
+    border: 1px solid var(--color-ink);
+    background: transparent;
+    color: var(--color-ink);
+  }
+  .btn-outline:hover {
+    background-color: var(--color-ink);
+    color: var(--color-white);
+  }
+
+  .btn-inverse {
+    border: 1px solid color-mix(in srgb, var(--color-white) 45%, transparent);
+    background-color: transparent;
+    color: var(--color-white);
+  }
+  .btn-inverse:hover {
+    background-color: var(--color-peach);
+    border-color: var(--color-peach);
+    color: var(--color-ink);
+  }
+
+  .btn-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-peach);
+    transition: opacity 200ms;
+  }
+  .btn-link:hover {
+    opacity: 0.7;
+  }
+
+  .field-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .field {
+    width: 100%;
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--color-tan);
+    background-color: var(--color-white);
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+    outline: none;
+    transition: border-color 200ms;
+  }
+  .field::placeholder {
+    color: color-mix(in srgb, var(--color-ink) 30%, transparent);
+  }
+  .field:focus {
+    border-color: var(--color-peach);
+  }
+  .field-error {
+    border-color: var(--color-danger);
+  }
+
+  .section-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-peach);
+  }
+
+  .nav-link {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--color-white) 80%, transparent);
+    transition: color 200ms;
+  }
+  .nav-link:hover {
+    color: var(--color-peach);
+  }
+
+  .container-page {
+    margin-inline: auto;
+    width: 100%;
+    max-width: 80rem;
+    padding-inline: 1.25rem;
+  }
+  @media (min-width: 48rem) {
+    .container-page {
+      padding-inline: 2.5rem;
+    }
+  }
+}
+
