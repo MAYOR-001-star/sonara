@@ -4,15 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 import { isSupabaseConfigured } from "./supabase/client";
+import { siteUrl } from "./products";
 
 export type AuthState = {
   error: string | null;
   /** Non-fatal notice, e.g. "check your inbox to confirm your email". */
   message: string | null;
 };
-
-const siteUrl = () =>
-  process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 /** Only allow same-site relative redirects, never an absolute/protocol URL. */
 const safeNext = (value: FormDataEntryValue | null) => {

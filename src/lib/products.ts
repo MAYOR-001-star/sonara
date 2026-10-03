@@ -37,6 +37,31 @@ export function formatPrice(
 export const shippingFlatRate = Number(process.env.SHIPPING_FLAT_RATE || 50);
 
 /**
+ * The public base URL of this deployment.
+ *
+ * `NEXT_PUBLIC_SITE_URL` is the source of truth and must be set explicitly. The
+ * fallbacks matter because this value decides where Google OAuth sends users and
+ * where the "View your order" button in a confirmation email points. If it were
+ * left unset in production both would resolve to `localhost:3000` - a sign-in
+ * that appears to succeed then dumps the customer on their own machine, and
+ * emails with dead links.
+ *
+ * Vercel injects `VERCEL_PROJECT_PRODUCTION_URL` (and `VERCEL_URL` on preview
+ * builds) automatically, so an unset `NEXT_PUBLIC_SITE_URL` degrades to the
+ * correct host instead of localhost.
+ *
+ * Server-only: never import this from a client component.
+ */
+export function siteUrl(): string {
+  const configured =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL;
+  if (configured) return configured.replace(/\/+$/, "");
+  return "http://localhost:3000";
+}
+
+/**
  * Contact address shown on the legal pages.
  *
  * Configurable rather than hardcoded so it can point at a real, monitored inbox

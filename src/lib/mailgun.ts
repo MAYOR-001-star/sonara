@@ -1,4 +1,10 @@
-import { categoryLabel, formatPrice, brandName, brandNameLower } from "./products";
+﻿import {
+  categoryLabel,
+  formatPrice,
+  brandName,
+  brandNameLower,
+  siteUrl,
+} from "./products";
 
 type OrderLine = {
   name: string;
@@ -24,13 +30,42 @@ const apiKey = () => process.env.MAILGUN_API_KEY;
 const domain = () => process.env.MAILGUN_DOMAIN;
 const from = () =>
   process.env.MAILGUN_FROM || `${brandName} Store <orders@${domain()}>`;
-const siteUrl = () =>
-  process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export function isMailgunConfigured() {
   const d = domain();
   return Boolean(apiKey() && d && !d.includes("yourdomain"));
 }
+
+/**
+ * A Mailgun *sandbox* domain only delivers to addresses you manually authorised
+ * in the dashboard. Crucially, the Messages API still returns HTTP 200 for any
+ * other recipient and then drops the message at delivery time - there is no API
+ * error to catch. So a 2xx response on a sandbox domain does NOT mean anybody
+ * received the email, and the app must never claim that it does.
+ *
+ * Set `MAILGUN_SANDBOX_LIMITS=false` once a real domain is verified, so the
+ * check follows the verified domain rather than being flipped by hand.
+ */
+export function isSandboxDomain() {
+  const d = (domain() || "").toLowerCase();
+  const override = process.env.MAILGUN_SANDBOX_LIMITS;
+  if (override === "false") return false;
+  if (override === "true") return true;
+  return d.includes("sandbox") || d.endsWith(".mailgun.org");
+}
+
+/**
+ * What the customer should be told. Delivery is only guaranteed on a real
+ * verified domain; on a sandbox the mail is silently discarded for anyone who
+ * is not on the authorised-recipients list.
+ */
+export type EmailResult = {
+  ok: boolean;
+  id?: string;
+  error?: string;
+  /** True when the API accepted the message but it will not actually be delivered. */
+  sandboxed?: boolean;
+};
 
 function orderRows(lines: OrderLine[]) {
   return lines
@@ -137,12 +172,20 @@ View your order: ${siteUrl()}/orders/${o.orderId}
  * Sends the order confirmation through the Mailgun Messages API using Basic
  * auth (`api:API_KEY`). Returns `{ ok, error }` rather than throwing, so a mail
  * outage never fails an order that has already been persisted.
+ *
+ * `ok: true` means the mail will genuinely be delivered. On a sandbox domain
+ * the API accepts everything with a 200 and drops what it may not send, so that
+ * case returns `ok: false, sandboxed: true` instead of pretending to succeed.
  */
-export async function sendOrderConfirmation(o: OrderSummary) {
+export async function sendOrderConfirmation(
+  o: OrderSummary,
+): Promise<EmailResult> {
   if (!isMailgunConfigured()) {
     console.warn("[mailgun] Not configured - skipping confirmation email.");
     return { ok: false, error: "Mailgun is not configured" };
   }
+
+  const sandboxed = isSandboxDomain();
 
   try {
     const res = await fetch(`https://api.mailgun.net/v3/${domain()}/messages`, {
@@ -157,6 +200,8 @@ export async function sendOrderConfirmation(o: OrderSummary) {
         subject: `Your ${brandNameLower} order ${o.orderId} is confirmed`,
         html: orderEmailHtml(o),
         text: orderEmailText(o),
+        // Lets you filter every order confirmation out in Mailgun -> Logs.
+        "o:tag": "order-confirmation",
       }),
     });
 
@@ -164,6 +209,23 @@ export async function sendOrderConfirmation(o: OrderSummary) {
     if (!res.ok) {
       console.error("[mailgun] send failed", res.status, payload);
       return { ok: false, error: payload?.message || `Mailgun ${res.status}` };
+    }
+
+    // A sandbox domain answers 200 and then silently discards the message for
+    // any recipient that is not on the authorised list. Reporting `ok: true`
+    // here would tell every other customer their receipt is on its way when it
+    // was never delivered, so the sandbox case is flagged instead.
+    if (sandboxed) {
+      console.warn(
+        `[mailgun] Sandbox domain - accepted but only delivers to authorised recipients. ${o.email} may not receive this.`,
+      );
+      return {
+        ok: false,
+        sandboxed: true,
+        id: payload?.id as string | undefined,
+        error:
+          "Sandbox Mailgun domain: this address is not an authorised recipient, so the email will not be delivered.",
+      };
     }
 
     return { ok: true, id: payload?.id as string | undefined };

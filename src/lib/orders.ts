@@ -22,7 +22,15 @@ export type CheckoutResult = {
   ok: boolean;
   orderId?: string;
   error?: string;
+  /**
+   * True only when Mailgun actually accepted the message on a domain that can
+   * deliver to anybody. False means "order saved, but no email is coming" -
+   * which is exactly what happens on a Mailgun sandbox domain for every customer
+   * not on the authorised-recipients list.
+   */
   emailSent?: boolean;
+  /** The address is on a sandbox domain, so the email was accepted then dropped. */
+  emailSandboxed?: boolean;
 };
 
 /** Short, human-friendly order reference, e.g. `AP-8F3K2Q`. */
@@ -160,9 +168,16 @@ export async function placeOrder(
   }
 
   // ---- Send the confirmation email (Mailgun) -------------------------------
+  // A mail failure never fails the order: the row is already persisted, and the
+  // customer can always read their receipt at /orders/<id> instead.
   const mail = await sendOrderConfirmation(summary);
 
-  return { ok: true, orderId, emailSent: mail.ok };
+  return {
+    ok: true,
+    orderId,
+    emailSent: mail.ok,
+    emailSandboxed: Boolean(mail.sandboxed),
+  };
 }
 
 /**

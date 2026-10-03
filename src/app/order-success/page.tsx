@@ -50,9 +50,26 @@ export default async function OrderSuccessPage({
           </h1>
 
           <p className="mt-4 text-sm text-ink/50">
-            {email === "sent"
-              ? "You will receive an email confirmation shortly."
-              : "Your order is confirmed. We could not send the email just now, but your order is safely recorded."}
+            {email === "sent" && (
+              <>A confirmation email is on its way to your inbox.</>
+            )}
+
+            {email === "sandboxed" && (
+              <>
+                Your order is saved, but the confirmation email could not be
+                delivered &mdash; the store is still running on Mailgun&rsquo;s
+                test domain, which only sends to its own authorised
+                addresses. Your receipt is available on this page and in your
+                account.
+              </>
+            )}
+
+            {(email === "skipped" || !email) && (
+              <>
+                Your order is confirmed. We could not send the email just now,
+                but your order is safely recorded.
+              </>
+            )}
           </p>
 
           {items.length > 0 && (

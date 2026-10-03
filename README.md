@@ -19,7 +19,8 @@ a bundled seed catalog so the store is fully browsable without any backend.
 - A Postgres database (Supabase, Neon, Railway, or local) — **required to
   checkout**, because RLS enforces order ownership there
 - Google OAuth credentials — required to sign in, and therefore to check out
-- A verified Mailgun domain — optional, only for confirmation emails
+- A **real verified Mailgun domain** — required for confirmation emails to reach
+  real customers. See [Order confirmation emails](#order-confirmation-emails)
 
 ## Getting started
 
@@ -51,6 +52,7 @@ See [`.env.example`](./.env.example) for the full annotated list.
 | `GOOGLE_CLIENT_SECRET` | Server-only OAuth secret |
 | `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` | Order email delivery |
 | `MAILGUN_FROM` | Verified sender address |
+| `MAILGUN_SANDBOX_LIMITS` | Optional override; auto-detected from the domain |
 | `NEXT_PUBLIC_SITE_URL` | Absolute base URL, used in auth redirects and emails |
 | `NEXT_PUBLIC_CURRENCY` | Display currency (default `USD`) |
 | `SHIPPING_FLAT_RATE` | Flat shipping charge in minor units |
@@ -246,6 +248,61 @@ curl -s "https://<project>.supabase.co/rest/v1/orders?select=order_id" \
 
 Must return `[]`, never order rows. The `products` table should still return 8.
 
+## Order confirmation emails
+
+Checkout always sends a confirmation through the Mailgun Messages API
+(`src/lib/mailgun.ts`) — a styled HTML receipt with a plain-text fallback, the
+line items, shipping address, payment method and a link to the order. A mail
+failure never fails the order; the receipt is always readable at `/orders/<id>`.
+
+### The sandbox trap
+
+Mailgun's **sandbox** domain (the `sandbox….mailgun.org` you get by default) is
+for testing only. It delivers *exclusively* to addresses you have manually added
+under **Sending → Sandbox domain → Authorized recipients**, and those addresses
+must also be verified.
+
+The dangerous part: **the API still returns HTTP 200 with a message id for every
+recipient**, and Mailgun quietly discards the messages it is not allowed to send.
+So a green "200 OK" is not evidence that anybody received anything.
+
+This app therefore does not treat a 2xx as proof of delivery. `isSandboxDomain()`
+detects the sandbox and the send returns `ok: false, sandboxed: true`, which
+surfaces as a distinct `?email=sandboxed` state on `/order-success` rather than
+the false "your confirmation is on its way" message. The order still succeeds —
+only the email is honestly reported as undelivered.
+
+### Making email work for real customers
+
+Verify your own sending domain once, and no code changes are needed:
+
+1. **Mailgun → Sending → Domains → Add domain**, e.g. `mg.yourdomain.com`.
+2. Add the DNS records Mailgun gives you (TXT, then MX/TXT for the sending
+   subdomain) at your DNS provider, and wait for the domain to show **Active**.
+3. Point the app at it in `.env.local`:
+
+   ```bash
+   MAILGUN_DOMAIN=mg.yourdomain.com
+   MAILGUN_FROM="Sonora Store <orders@mg.yourdomain.com>"
+   NEXT_PUBLIC_SITE_URL=https://yourdomain.com   # so the email links work
+   ```
+
+4. Verify delivery against an address that is **not** authorised anywhere:
+
+   ```bash
+   npm run check:email -- some.random.address@gmail.com
+   ```
+
+   It sends a real message and prints what will happen. `✓ Real verified domain —
+   this message is being delivered for real.` means any signed-in customer's
+   order confirmation will now reach them.
+
+`MAILGUN_SANDBOX_LIMITS` only needs setting if the auto-detection is wrong for
+your setup (e.g. a real domain that happens to end in `.mailgun.org`).
+
+Every confirmation is tagged `order-confirmation`, so you can filter them in
+**Mailgun → Logs** and watch real delivery, bounces and complaints per order.
+
 ## Deploying
 
 Deploy to Vercel or any Node host. Set the same environment variables in the
@@ -259,6 +316,9 @@ Before going live:
 - [ ] Use Supabase **Edge Rate Limiting** if deploying serverless, so the checkout
       limit holds across instances.
 - [ ] Confirm email confirmation and redirect URLs allow your production domain.
+- [ ] **Verify a real Mailgun sending domain** (not the sandbox) and prove delivery
+      with `npm run check:email -- <an address that is not authorised>` — until
+      then, order confirmations only reach Mailgun's authorised recipients.
 - [ ] Review `/terms` and `/privacy` — they still describe guest checkout and
       quote `privacy@sonora.com` / `legal@sonora.com`, which are placeholders.
 

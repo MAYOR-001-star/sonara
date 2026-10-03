@@ -111,8 +111,16 @@ export default function CheckoutForm({
       }
 
       clear();
+      // `sandboxed` is distinct from `skipped`: a sandboxed mail was accepted by
+      // Mailgun and then dropped, which is the confusing case worth telling the
+      // customer about rather than quietly showing a generic "not sent".
+      const emailStatus = data.emailSent
+        ? "sent"
+        : data.emailSandboxed
+          ? "sandboxed"
+          : "skipped";
       router.push(
-        `/order-success?order=${data.orderId}&email=${data.emailSent ? "sent" : "skipped"}`,
+        `/order-success?order=${data.orderId}&email=${emailStatus}`,
       );
     } catch {
       setFormError("Network error. Please check your connection and try again.");
