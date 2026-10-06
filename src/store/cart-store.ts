@@ -18,6 +18,8 @@ export type CartLineSeed = Omit<CartLine, "quantity">;
 type CartState = {
   lines: CartLine[];
   isOpen: boolean;
+  isRealtimeConnected: boolean;
+  lastSyncedAt: Date | null;
   currentUserId: string | null;
   setCurrentUserId: (id: string | null) => void;
   setLines: (lines: CartLine[]) => void;
@@ -34,21 +36,116 @@ type CartState = {
 const MAX_PER_LINE = 10;
 export const WEBSOCKET_CHANNEL = "audiophile_cart_websocket_sync";
 
-// Global WebSocket channel reference
+// Global WebSocket channel reference and queue
 let wsChannel: RealtimeChannel | null = null;
+let pendingBroadcast: CartLine[] | null = null;
+let isChannelInitializing = false;
 
 export function setWebSocketChannel(ch: RealtimeChannel | null) {
   wsChannel = ch;
 }
 
 export function broadcastCart(lines: CartLine[]) {
-  if (wsChannel) {
-    wsChannel.send({
-      type: "broadcast",
-      event: "cart_sync",
-      payload: { lines },
-    });
+  if (wsChannel && useCartStore.getState().isRealtimeConnected) {
+    wsChannel
+      .send({
+        type: "broadcast",
+        event: "cart_sync",
+        payload: { lines },
+      })
+      .then((status) => {
+        if (status !== "ok") {
+          console.warn("[WebSocket Cart Sync] Broadcast returned non-ok status:", status);
+        }
+      })
+      .catch((err) => {
+        console.error("[WebSocket Cart Sync] Broadcast send error:", err);
+      });
+  } else {
+    // Queue to send as soon as connection is ready
+    pendingBroadcast = lines;
   }
+}
+
+/**
+ * Initializes and maintains the Supabase Realtime WebSocket channel for the cart.
+ * Idempotent: can be called safely from layout or StoreChrome.
+ */
+export function initCartWebSocket() {
+  if (typeof window === "undefined") return () => {};
+  if (wsChannel && useCartStore.getState().isRealtimeConnected) {
+    return () => {};
+  }
+  if (isChannelInitializing) return () => {};
+
+  isChannelInitializing = true;
+  const supabase = createClient();
+
+  const channel = supabase.channel(WEBSOCKET_CHANNEL, {
+    config: { broadcast: { self: false } },
+  });
+
+  channel
+    .on(
+      "broadcast",
+      { event: "cart_sync" },
+      ({ payload }: { payload: { lines?: CartLine[] } }) => {
+        if (payload?.lines && Array.isArray(payload.lines)) {
+          useCartStore.setState({
+            lines: payload.lines,
+            lastSyncedAt: new Date(),
+          });
+        }
+      },
+    )
+    .on("broadcast", { event: "cart_request" }, () => {
+      // Another device just connected and requested current cart
+      const currentLines = useCartStore.getState().lines;
+      if (currentLines.length > 0 && channel) {
+        channel.send({
+          type: "broadcast",
+          event: "cart_sync",
+          payload: { lines: currentLines },
+        });
+      }
+    })
+    .subscribe((status: string, err?: Error) => {
+      isChannelInitializing = false;
+      if (status === "SUBSCRIBED") {
+        wsChannel = channel;
+        useCartStore.setState({ isRealtimeConnected: true });
+
+        // Flush any broadcast that occurred during initial connection
+        if (pendingBroadcast) {
+          channel.send({
+            type: "broadcast",
+            event: "cart_sync",
+            payload: { lines: pendingBroadcast },
+          });
+          pendingBroadcast = null;
+        } else if (useCartStore.getState().lines.length === 0) {
+          // If our cart is empty, ask any active peer (e.g. mobile) for their current cart
+          channel.send({
+            type: "broadcast",
+            event: "cart_request",
+            payload: {},
+          });
+        }
+      } else if (
+        status === "CLOSED" ||
+        status === "CHANNEL_ERROR" ||
+        status === "TIMED_OUT"
+      ) {
+        useCartStore.setState({ isRealtimeConnected: false });
+        if (err) {
+          console.warn("[WebSocket Cart Sync] Connection status:", status, err);
+        }
+      }
+    });
+
+  return () => {
+    // Keep connection alive across client navigation
+  };
 }
 
 // Background database sync
@@ -95,10 +192,12 @@ async function syncClear(userId: string) {
 export const useCartStore = create<CartState>()((set, get) => ({
   lines: [],
   isOpen: false,
+  isRealtimeConnected: false,
+  lastSyncedAt: null,
   currentUserId: null,
 
   setCurrentUserId: (id) => set({ currentUserId: id }),
-  setLines: (lines) => set({ lines }),
+  setLines: (lines) => set({ lines, lastSyncedAt: new Date() }),
 
   addLine: (product, quantity = 1) => {
     const qty = Math.max(1, Math.min(MAX_PER_LINE, quantity));
@@ -117,7 +216,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
       nextLines = [...state.lines, updatedLine];
     }
 
-    set({ lines: nextLines, isOpen: true });
+    set({ lines: nextLines, isOpen: true, lastSyncedAt: new Date() });
 
     // 1. Instant WebSocket broadcast
     broadcastCart(nextLines);
@@ -133,14 +232,14 @@ export const useCartStore = create<CartState>()((set, get) => ({
       ...product,
       quantity: Math.min(MAX_PER_LINE, 1),
     }));
-    set({ lines: nextLines, isOpen: true });
+    set({ lines: nextLines, isOpen: true, lastSyncedAt: new Date() });
     broadcastCart(nextLines);
   },
 
   removeLine: (id) => {
     const state = get();
     const nextLines = state.lines.filter((l) => l.id !== id);
-    set({ lines: nextLines });
+    set({ lines: nextLines, lastSyncedAt: new Date() });
 
     // 1. Instant WebSocket broadcast
     broadcastCart(nextLines);
@@ -160,7 +259,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
       l.id === id ? { ...l, quantity: clampedQty } : l,
     );
 
-    set({ lines: nextLines });
+    set({ lines: nextLines, lastSyncedAt: new Date() });
 
     // 1. Instant WebSocket broadcast
     broadcastCart(nextLines);
@@ -173,7 +272,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
 
   clear: () => {
     const state = get();
-    set({ lines: [] });
+    set({ lines: [], lastSyncedAt: new Date() });
 
     // 1. Instant WebSocket broadcast empty cart
     broadcastCart([]);

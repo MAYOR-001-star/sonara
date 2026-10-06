@@ -8,7 +8,15 @@ import ProductArt from "./ProductArt";
 import QuantityStepper from "./QuantityStepper";
 
 export default function CartDrawer() {
-  const { lines, isOpen, close, removeLine, setQuantity, clear } = useCartStore();
+  const {
+    lines,
+    isOpen,
+    close,
+    removeLine,
+    setQuantity,
+    clear,
+    isRealtimeConnected,
+  } = useCartStore();
   const { subtotal, grandTotal } = cartTotals(lines);
 
   // Lock body scroll while the drawer is open.
@@ -46,9 +54,32 @@ export default function CartDrawer() {
         className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
       >
         <header className="flex items-center justify-between border-b border-tan px-7 py-6">
-          <h2 className="text-sm">
-            Cart ({count})
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm">
+              Cart ({count})
+            </h2>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase transition-colors ${
+                isRealtimeConnected
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
+              }`}
+              title={
+                isRealtimeConnected
+                  ? "Realtime WebSocket connected"
+                  : "Connecting to Realtime WebSocket..."
+              }
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  isRealtimeConnected
+                    ? "bg-emerald-500 animate-pulse"
+                    : "bg-amber-400"
+                }`}
+              />
+              {isRealtimeConnected ? "Live Sync" : "Syncing..."}
+            </span>
+          </div>
           {lines.length > 0 && (
             <button
               type="button"
