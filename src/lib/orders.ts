@@ -156,6 +156,11 @@ export async function placeOrder(
         })),
       );
       if (itemsError) throw itemsError;
+
+      // Wipe active cart items from database on successful checkout
+      if (userId) {
+        await supabase.from("cart_items").delete().eq("user_id", userId);
+      }
     } catch (err) {
       console.error("[orders] persistence failed:", err);
       return {
