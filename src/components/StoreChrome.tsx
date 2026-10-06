@@ -7,17 +7,7 @@ import Header from "./Header";
 import Footer from "./Footer";
 import CartDrawer from "./CartDrawer";
 import { useCartStore, type CartLine } from "@/store/cart-store";
-import { seedProducts } from "@/lib/seed-products";
 import { createClient } from "@/lib/supabase/client";
-
-const seedLines = () =>
-  seedProducts.map((p) => ({
-    id: p.id,
-    slug: p.slug,
-    name: p.name,
-    price: p.price,
-    accent: p.accent,
-  }));
 
 function CartDatabaseSync() {
   useEffect(() => {
@@ -31,7 +21,12 @@ function CartDatabaseSync() {
           .eq("user_id", userId)
           .order("created_at", { ascending: true });
 
-        if (!error && data) {
+        if (error) {
+          console.error("[CartDatabaseSync] Fetch error:", error.message);
+          return;
+        }
+
+        if (data) {
           const mapped: CartLine[] = data.map((row) => ({
             id: row.product_id,
             name: row.product_name,
@@ -43,34 +38,8 @@ function CartDatabaseSync() {
           useCartStore.getState().setLines(mapped);
         }
       } catch (err) {
-        console.warn("[CartDatabaseSync] Fetch failed:", err);
+        console.error("[CartDatabaseSync] Fetch failed:", err);
       }
-    };
-
-    const syncExistingAndFetch = async (userId: string) => {
-      const existingLines = useCartStore.getState().lines;
-      if (existingLines.length > 0) {
-        for (const line of existingLines) {
-          try {
-            await supabase.from("cart_items").upsert(
-              {
-                user_id: userId,
-                product_id: line.id,
-                product_name: line.name,
-                product_slug: line.slug || line.id,
-                unit_price: line.price,
-                quantity: line.quantity,
-                accent: line.accent || "mist",
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: "user_id,product_id" },
-            );
-          } catch {
-            // Ignore single row upsert failure
-          }
-        }
-      }
-      await fetchDbCart(userId);
     };
 
     // 1. Initial user check
@@ -83,7 +52,7 @@ function CartDatabaseSync() {
       }
     });
 
-    // 2. Auth changes (only on explicit login / logout, not on window focus/tokens)
+    // 2. Auth changes (only explicit login/logout)
     const {
       data: { subscription: authSub },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -96,9 +65,9 @@ function CartDatabaseSync() {
       }
     });
 
-    // 3. Realtime subscription on cart_items table
+    // 3. Shared Realtime subscription on cart_items table
     const channel = supabase
-      .channel("web_cart_items_realtime")
+      .channel("cart_items_realtime_shared")
       .on(
         "postgres_changes",
         {
@@ -106,7 +75,7 @@ function CartDatabaseSync() {
           schema: "public",
           table: "cart_items",
         },
-        async () => {
+        () => {
           const currentUserId = useCartStore.getState().currentUserId;
           if (currentUserId) {
             fetchDbCart(currentUserId);

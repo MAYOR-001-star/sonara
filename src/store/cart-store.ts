@@ -32,14 +32,11 @@ type CartState = {
 
 const MAX_PER_LINE = 10;
 
-// Helper to push updates to Supabase cart_items table in the background
-async function syncUpsert(
-  userId: string,
-  line: CartLine,
-) {
+// Helper to push updates to Supabase cart_items table
+async function syncUpsert(userId: string, line: CartLine) {
   try {
     const supabase = createClient();
-    await supabase.from("cart_items").upsert(
+    const { error } = await supabase.from("cart_items").upsert(
       {
         user_id: userId,
         product_id: line.id,
@@ -52,35 +49,46 @@ async function syncUpsert(
       },
       { onConflict: "user_id,product_id" },
     );
+    if (error) {
+      console.error("[cart-store] Upsert error:", error.message);
+    }
   } catch (err) {
-    console.warn("[cart-store] Upsert failed:", err);
+    console.error("[cart-store] Upsert failed:", err);
   }
 }
 
 async function syncDelete(userId: string, productId: string) {
   try {
     const supabase = createClient();
-    await supabase
+    const { error } = await supabase
       .from("cart_items")
       .delete()
       .eq("user_id", userId)
       .eq("product_id", productId);
+    if (error) {
+      console.error("[cart-store] Delete error:", error.message);
+    }
   } catch (err) {
-    console.warn("[cart-store] Delete failed:", err);
+    console.error("[cart-store] Delete failed:", err);
   }
 }
 
 async function syncClear(userId: string) {
   try {
     const supabase = createClient();
-    await supabase.from("cart_items").delete().eq("user_id", userId);
-    await supabase.auth.updateUser({ data: { cart: null } });
+    const { error } = await supabase
+      .from("cart_items")
+      .delete()
+      .eq("user_id", userId);
+    if (error) {
+      console.error("[cart-store] Clear error:", error.message);
+    }
   } catch (err) {
-    console.warn("[cart-store] Clear failed:", err);
+    console.error("[cart-store] Clear failed:", err);
   }
 }
 
-// Database-only store (no localStorage persistence!)
+// Database-only store (no localStorage!)
 export const useCartStore = create<CartState>()((set, get) => ({
   lines: [],
   isOpen: false,
@@ -108,7 +116,6 @@ export const useCartStore = create<CartState>()((set, get) => ({
 
     set({ lines: nextLines, isOpen: true });
 
-    // Sync directly to Supabase cart_items table if user is signed in
     if (state.currentUserId) {
       syncUpsert(state.currentUserId, updatedLine);
     }
