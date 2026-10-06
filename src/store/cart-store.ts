@@ -74,6 +74,7 @@ async function syncClear(userId: string) {
   try {
     const supabase = createClient();
     await supabase.from("cart_items").delete().eq("user_id", userId);
+    await supabase.auth.updateUser({ data: { cart: null } });
   } catch (err) {
     console.warn("[cart-store] Clear failed:", err);
   }
@@ -149,7 +150,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
 
   clear: () => {
     const state = get();
-    set({ lines: [], isOpen: false });
+    set({ lines: [] });
 
     if (state.currentUserId) {
       syncClear(state.currentUserId);

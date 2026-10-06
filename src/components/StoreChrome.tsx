@@ -47,6 +47,32 @@ function CartDatabaseSync() {
       }
     };
 
+    const syncExistingAndFetch = async (userId: string) => {
+      const existingLines = useCartStore.getState().lines;
+      if (existingLines.length > 0) {
+        for (const line of existingLines) {
+          try {
+            await supabase.from("cart_items").upsert(
+              {
+                user_id: userId,
+                product_id: line.id,
+                product_name: line.name,
+                product_slug: line.slug || line.id,
+                unit_price: line.price,
+                quantity: line.quantity,
+                accent: line.accent || "mist",
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "user_id,product_id" },
+            );
+          } catch {
+            // Ignore single row upsert failure
+          }
+        }
+      }
+      await fetchDbCart(userId);
+    };
+
     // 1. Initial user check
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
@@ -54,18 +80,17 @@ function CartDatabaseSync() {
         fetchDbCart(user.id);
       } else {
         useCartStore.getState().setCurrentUserId(null);
-        useCartStore.getState().setLines([]);
       }
     });
 
-    // 2. Auth changes (login / logout)
+    // 2. Auth changes (only on explicit login / logout, not on window focus/tokens)
     const {
       data: { subscription: authSub },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
         useCartStore.getState().setCurrentUserId(session.user.id);
         fetchDbCart(session.user.id);
-      } else {
+      } else if (event === "SIGNED_OUT") {
         useCartStore.getState().setCurrentUserId(null);
         useCartStore.getState().setLines([]);
       }
@@ -81,13 +106,9 @@ function CartDatabaseSync() {
           schema: "public",
           table: "cart_items",
         },
-        async (payload) => {
+        async () => {
           const currentUserId = useCartStore.getState().currentUserId;
-          const targetUserId =
-            (payload.new as { user_id?: string })?.user_id ||
-            (payload.old as { user_id?: string })?.user_id;
-
-          if (currentUserId && targetUserId === currentUserId) {
+          if (currentUserId) {
             fetchDbCart(currentUserId);
           }
         },
@@ -99,39 +120,6 @@ function CartDatabaseSync() {
       supabase.removeChannel(channel);
     };
   }, []);
-
-  return null;
-}
-
-function DevCartFill() {
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (process.env.NODE_ENV === "production") return;
-
-    const store = useCartStore;
-    const apply = () => store.getState().fillCart(seedLines());
-
-    const w = window as unknown as {
-      fillCart?: () => void;
-      clearCart?: () => void;
-    };
-    w.fillCart = apply;
-    w.clearCart = () => store.getState().clear();
-
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("fillCart") === "1") {
-      apply();
-    }
-    if (params.get("clearCart") === "1") {
-      store.getState().clear();
-    }
-
-    return () => {
-      delete w.fillCart;
-      delete w.clearCart;
-    };
-  }, [pathname]);
 
   return null;
 }
@@ -149,7 +137,6 @@ export default function StoreChrome({ children }: { children: ReactNode }) {
     return (
       <>
         <CartDatabaseSync />
-        <DevCartFill />
         <main className="min-h-screen">{children}</main>
       </>
     );
@@ -158,7 +145,6 @@ export default function StoreChrome({ children }: { children: ReactNode }) {
   return (
     <>
       <CartDatabaseSync />
-      <DevCartFill />
       <Header />
       <main className="flex flex-1 flex-col">{children}</main>
       <Footer />
