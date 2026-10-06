@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export type CartLine = {
   id: string;
@@ -31,12 +32,30 @@ type CartState = {
 };
 
 const MAX_PER_LINE = 10;
+export const WEBSOCKET_CHANNEL = "audiophile_cart_websocket_sync";
 
-// Helper to push updates to Supabase cart_items table
+// Global WebSocket channel reference
+let wsChannel: RealtimeChannel | null = null;
+
+export function setWebSocketChannel(ch: RealtimeChannel | null) {
+  wsChannel = ch;
+}
+
+export function broadcastCart(lines: CartLine[]) {
+  if (wsChannel) {
+    wsChannel.send({
+      type: "broadcast",
+      event: "cart_sync",
+      payload: { lines },
+    });
+  }
+}
+
+// Background database sync
 async function syncUpsert(userId: string, line: CartLine) {
   try {
     const supabase = createClient();
-    const { error } = await supabase.from("cart_items").upsert(
+    await supabase.from("cart_items").upsert(
       {
         user_id: userId,
         product_id: line.id,
@@ -49,46 +68,30 @@ async function syncUpsert(userId: string, line: CartLine) {
       },
       { onConflict: "user_id,product_id" },
     );
-    if (error) {
-      console.error("[cart-store] Upsert error:", error.message);
-    }
-  } catch (err) {
-    console.error("[cart-store] Upsert failed:", err);
-  }
+  } catch {}
 }
 
 async function syncDelete(userId: string, productId: string) {
   try {
     const supabase = createClient();
-    const { error } = await supabase
+    await supabase
       .from("cart_items")
       .delete()
       .eq("user_id", userId)
       .eq("product_id", productId);
-    if (error) {
-      console.error("[cart-store] Delete error:", error.message);
-    }
-  } catch (err) {
-    console.error("[cart-store] Delete failed:", err);
-  }
+  } catch {}
 }
 
 async function syncClear(userId: string) {
   try {
     const supabase = createClient();
-    const { error } = await supabase
+    await supabase
       .from("cart_items")
       .delete()
       .eq("user_id", userId);
-    if (error) {
-      console.error("[cart-store] Clear error:", error.message);
-    }
-  } catch (err) {
-    console.error("[cart-store] Clear failed:", err);
-  }
+  } catch {}
 }
 
-// Database-only store (no localStorage!)
 export const useCartStore = create<CartState>()((set, get) => ({
   lines: [],
   isOpen: false,
@@ -116,24 +119,33 @@ export const useCartStore = create<CartState>()((set, get) => ({
 
     set({ lines: nextLines, isOpen: true });
 
+    // 1. Instant WebSocket broadcast
+    broadcastCart(nextLines);
+
+    // 2. Database save in background
     if (state.currentUserId) {
       syncUpsert(state.currentUserId, updatedLine);
     }
   },
 
-  fillCart: (products) =>
-    set((state) => ({
-      lines: products.map((product) => ({
-        ...product,
-        quantity: Math.min(MAX_PER_LINE, 1),
-      })),
-      isOpen: true,
-    })),
+  fillCart: (products) => {
+    const nextLines = products.map((product) => ({
+      ...product,
+      quantity: Math.min(MAX_PER_LINE, 1),
+    }));
+    set({ lines: nextLines, isOpen: true });
+    broadcastCart(nextLines);
+  },
 
   removeLine: (id) => {
     const state = get();
-    set({ lines: state.lines.filter((l) => l.id !== id) });
+    const nextLines = state.lines.filter((l) => l.id !== id);
+    set({ lines: nextLines });
 
+    // 1. Instant WebSocket broadcast
+    broadcastCart(nextLines);
+
+    // 2. Database delete in background
     if (state.currentUserId) {
       syncDelete(state.currentUserId, id);
     }
@@ -144,12 +156,16 @@ export const useCartStore = create<CartState>()((set, get) => ({
     const clampedQty = Math.max(1, Math.min(MAX_PER_LINE, quantity));
     const target = state.lines.find((l) => l.id === id);
 
-    set({
-      lines: state.lines.map((l) =>
-        l.id === id ? { ...l, quantity: clampedQty } : l,
-      ),
-    });
+    const nextLines = state.lines.map((l) =>
+      l.id === id ? { ...l, quantity: clampedQty } : l,
+    );
 
+    set({ lines: nextLines });
+
+    // 1. Instant WebSocket broadcast
+    broadcastCart(nextLines);
+
+    // 2. Database update in background
     if (state.currentUserId && target) {
       syncUpsert(state.currentUserId, { ...target, quantity: clampedQty });
     }
@@ -159,6 +175,10 @@ export const useCartStore = create<CartState>()((set, get) => ({
     const state = get();
     set({ lines: [] });
 
+    // 1. Instant WebSocket broadcast empty cart
+    broadcastCart([]);
+
+    // 2. Database clear in background
     if (state.currentUserId) {
       syncClear(state.currentUserId);
     }
